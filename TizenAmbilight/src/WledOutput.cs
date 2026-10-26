@@ -34,6 +34,99 @@ namespace TizenAmbilight
         /// Ethernet MTU of UDP payload). Larger strips would need the DNRGB protocol.</summary>
         public const int MaxDrgbLeds = 490;
 
+        // ---- DDP (Distributed Display Protocol, WLED UDP port 4048) ----
+        // DRGB is one datagram, so it tops out at 490 LEDs. DDP splits a frame over several datagrams
+        // and marks the LAST one with a PUSH flag; WLED holds the partial frame until the push arrives,
+        // so a long strip updates atomically instead of tearing between packets. Layout follows the
+        // 3waylabs DDP spec (the same 10-byte header the Android sibling project wled-tv sends).
+        public const int DdpPort = 4048;
+        public const int DdpHeaderLen = 10;
+        /// <summary>Payload bytes per DDP datagram: 480 RGB LEDs, comfortably inside one MTU.</summary>
+        public const int DdpMaxPayload = 1440;
+        /// <summary>Upper bound for DDP strips. Not a protocol limit; a sanity cap that the WLED
+        /// controller itself (ESP8266 especially) runs out of RAM or frame time well before.</summary>
+        public const int MaxDdpLeds = 1500;
+
+        public const string ProtocolNameDrgb = "drgb";
+        public const string ProtocolNameDdp = "ddp";
+
+        public static bool IsDdp(string protocol)
+        {
+            return string.Equals(protocol, ProtocolNameDdp, StringComparison.OrdinalIgnoreCase);
+        }
+
+        /// <summary>LED ceiling for a protocol: one datagram for DRGB, the DDP sanity cap otherwise.</summary>
+        public static int MaxLeds(string protocol)
+        {
+            return IsDdp(protocol) ? MaxDdpLeds : MaxDrgbLeds;
+        }
+
+        /// <summary>Default UDP port for a protocol.</summary>
+        public static int DefaultPortFor(string protocol)
+        {
+            return IsDdp(protocol) ? DdpPort : DefaultPort;
+        }
+
+        static int _ddpSeq;     // 1..15, advanced once per frame; render thread plus shutdown, under _udpLock
+
+        /// <summary>Wrap a DRGB payload (the output of <see cref="BuildDrgbMapped"/> or
+        /// <see cref="BuildBlackout"/>) as DDP datagrams. The two header bytes of the DRGB payload are
+        /// dropped; DDP carries no timeout byte, so WLED's own "realtime timeout" governs how long the
+        /// strip stays live after the last frame.
+        ///
+        /// Every datagram of a frame shares one sequence number (1..15). Only the last carries the PUSH
+        /// flag. The offset field is in BYTES (channels), not LEDs.</summary>
+        public static byte[][] BuildDdp(byte[] drgb, byte sequence)
+        {
+            if (drgb == null) throw new ArgumentNullException(nameof(drgb));
+            int total = drgb.Length - 2;
+            if (total < 0) total = 0;
+            int count = total == 0 ? 1 : (total + DdpMaxPayload - 1) / DdpMaxPayload;
+            var packets = new byte[count][];
+            for (int i = 0; i < count; i++)
+            {
+                int offset = i * DdpMaxPayload;
+                int len = Math.Min(DdpMaxPayload, total - offset);
+                if (len < 0) len = 0;
+                byte[] d = new byte[DdpHeaderLen + len];
+                d[0] = (byte)(0x40 | (i == count - 1 ? 0x01 : 0x00));   // version 1, PUSH on the last
+                d[1] = (byte)(sequence & 0x0F);
+                d[2] = 0x01;                                            // data type: RGB
+                d[3] = 0x01;                                            // destination id: default device
+                d[4] = (byte)(offset >> 24);
+                d[5] = (byte)(offset >> 16);
+                d[6] = (byte)(offset >> 8);
+                d[7] = (byte)offset;
+                d[8] = (byte)(len >> 8);
+                d[9] = (byte)len;
+                if (len > 0) Buffer.BlockCopy(drgb, 2 + offset, d, DdpHeaderLen, len);
+                packets[i] = d;
+            }
+            return packets;
+        }
+
+        /// <summary>Send one finished frame with the chosen protocol. DRGB frames go out as the single
+        /// datagram they already are; DDP frames are split by <see cref="BuildDdp"/>. Returns null on
+        /// success or a short error string; never throws.</summary>
+        public static string SendFrame(string ip, int port, string protocol, byte[] drgbPayload)
+        {
+            if (!IsDdp(protocol)) return Send(ip, port, drgbPayload);
+
+            byte seq;
+            lock (_udpLock)
+            {
+                _ddpSeq = _ddpSeq % 15 + 1;
+                seq = (byte)_ddpSeq;
+            }
+            byte[][] packets = BuildDdp(drgbPayload, seq);
+            for (int i = 0; i < packets.Length; i++)
+            {
+                string err = Send(ip, port, packets[i]);
+                if (err != null) return err;
+            }
+            return null;
+        }
+
         /// <summary>Timeout byte for the stall BLACKOUT packet. Deliberately longer than the normal
         /// frame timeout: the app re-sends every BlackoutHoldMs (1 s), so 4 s means up to three
         /// consecutive lost packets still leave WLED latched to black. At 1 s a single dropped datagram
@@ -194,6 +287,12 @@ namespace TizenAmbilight
         public static string SendBlackout(string ip, int port, int ledCount)
         {
             return Send(ip, port, BuildBlackout(ledCount));
+        }
+
+        /// <summary>Protocol-aware blackout (DDP strips need the multi-datagram form).</summary>
+        public static string SendBlackout(string ip, int port, int ledCount, string protocol)
+        {
+            return SendFrame(ip, port, protocol, BuildBlackout(ledCount));
         }
 
         static UdpClient _udp;

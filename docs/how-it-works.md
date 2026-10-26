@@ -11,7 +11,7 @@ video plane (960x540 NV12, in memory)
   -> gamut map BT.2020 -> BT.709                    (soft: desaturate toward luminance)
   -> saturation -> adaptive EMA -> perimeter ring blur -> stale fade
   -> tone map (black-level crush + scene-adaptive gamma)
-  -> WLED DRGB over UDP :21324
+  -> WLED DRGB over UDP :21324 (or DDP :4048)
 ```
 
 ## Contents
@@ -279,8 +279,28 @@ byte 1     timeout seconds
 byte 2..   3 bytes/LED     R,G,B per LED
 ```
 
-One datagram per frame, so each frame is atomic. DRGB caps a datagram at 490 LEDs, and the app caps
-`ledCount` to match. Longer strips would need WLED's DNRGB protocol, which is not implemented.
+One datagram per frame, so each frame is atomic. DRGB caps a datagram at 490 LEDs, and with
+`protocol` `drgb` (the default) the app caps `ledCount` to match.
+
+Set `protocol` to `ddp` for longer strips. **DDP** (UDP port 4048) splits a frame over several datagrams
+of up to 1440 bytes (480 LEDs), each with a 10-byte header:
+
+```
+byte 0     0x40 | 0x01 on the LAST datagram only (version 1, PUSH)
+byte 1     sequence 1..15, the same for every datagram of one frame
+byte 2     0x01            RGB
+byte 3     0x01            default destination
+byte 4..7  offset in BYTES, big-endian
+byte 8..9  payload length, big-endian
+byte 10..  R,G,B per LED
+```
+
+WLED holds a partial frame until the PUSH datagram arrives, so a long strip updates atomically rather
+than tearing between packets. DDP has no timeout byte: the strip stays live for WLED's own
+"realtime timeout" (Sync Interfaces, default 2.5 s) after the last frame. The app caps `ledCount` at 1500
+for DDP, a sanity limit rather than a protocol one. The DDP path comes from the Android sibling project
+[wled-tv](https://github.com/eversonl/wled-tv). The packet layout is covered by the host self-test; it has
+**not** been run against a real WLED controller from this repo yet.
 
 **DRGB is last-packet-wins, so exactly one sender may own the strip.** Two senders produce visible
 flicker between them. If you add another sender, have it pause this app through the control channel
@@ -319,7 +339,7 @@ WLED then reverts to its own stored colour, which is how an ambilight ends up gl
 | | TizenAmbilight | [HyperTizen](https://github.com/reisxd/HyperTizen) | [TizenGlow](https://github.com/DuckieOnQuacks/TizenGlow) |
 |---|---|---|---|
 | What is read | the full decoded video plane, 960×540 | a handful of sample points (`libvideoenhance`) | 6–14 sample points (`libvideoenhance`) |
-| Output | WLED DRGB, direct | Hyperion / HyperHDR | WLED DDP or HyperHDR |
+| Output | WLED DRGB or DDP, direct | Hyperion / HyperHDR | WLED DDP or HyperHDR |
 | HDR | PQ decode + BT.2020→709 gamut map | n/a | not documented |
 | UI | none (config file, optional control URL) | TizenBrew module | TizenBrew module, calibration screen |
 | Tested on | one 2025 TV (Tizen 9) | Tizen 6.5+ | Tizen 6.5+ |

@@ -484,6 +484,47 @@ namespace DecoderSelfTest
                       (2 + WledOutput.MaxDrgbLeds * 3).ToString());
             }
 
+            // ============================================================ 10b. DDP output
+            Console.WriteLine();
+            Console.WriteLine("[10b] DDP output (multi-datagram frames, push flag, offsets)");
+            {
+                // 600 LEDs = 1800 bytes of RGB: one full 1440-byte datagram plus a 360-byte tail.
+                var z = new ZoneColors(600);
+                for (int i = 0; i < 600; i++) { z.R[i] = (byte)(i % 251); z.G[i] = (byte)((i * 3) % 251); z.B[i] = (byte)((i * 7) % 251); }
+                byte[] drgb = WledOutput.BuildDrgbMapped(z, 1, 1.0, 1.0, 0.0, 0, false, 600);
+                byte[][] pk = WledOutput.BuildDdp(drgb, 5);
+                Check(pk.Length == 2, "600 LEDs split into 2 datagrams", pk.Length.ToString());
+                Check(pk[0].Length == 10 + 1440 && pk[1].Length == 10 + 360, "datagram sizes 1450 and 370",
+                      pk[0].Length + "," + pk[1].Length);
+                Check(pk[0][0] == 0x40 && pk[1][0] == 0x41, "version 1; PUSH only on the last datagram",
+                      "0x" + pk[0][0].ToString("x2") + ",0x" + pk[1][0].ToString("x2"));
+                Check(pk[0][1] == 5 && pk[1][1] == 5, "both datagrams of a frame share the sequence number",
+                      pk[0][1] + "," + pk[1][1]);
+                Check(pk[0][2] == 0x01 && pk[0][3] == 0x01, "RGB data type, default destination id",
+                      pk[0][2] + "," + pk[0][3]);
+                int off1 = (pk[1][4] << 24) | (pk[1][5] << 16) | (pk[1][6] << 8) | pk[1][7];
+                int len0 = (pk[0][8] << 8) | pk[0][9], len1 = (pk[1][8] << 8) | pk[1][9];
+                Check(off1 == 1440, "second datagram offset is in bytes (1440)", off1.ToString());
+                Check(len0 == 1440 && len1 == 360, "length fields", len0 + "," + len1);
+
+                bool same = true;
+                for (int i = 0; i < 1440 && same; i++) same = pk[0][10 + i] == drgb[2 + i];
+                for (int i = 0; i < 360 && same; i++) same = pk[1][10 + i] == drgb[2 + 1440 + i];
+                Check(same, "DDP payload bytes are the DRGB colour bytes, in order", "");
+
+                byte[][] small = WledOutput.BuildDdp(WledOutput.BuildDrgb(new ZoneColors(73), 1), 15);
+                Check(small.Length == 1 && small[0][0] == 0x41 && small[0].Length == 10 + 219,
+                      "73 LEDs fit one datagram that carries PUSH", small.Length + "," + small[0].Length);
+                Check(WledOutput.BuildDdp(WledOutput.BuildBlackout(1500), 1).Length == 4,
+                      "1500 LED blackout = 4 datagrams (4500 bytes)", "");
+                Check(WledOutput.IsDdp("DDP") && WledOutput.IsDdp("ddp") && !WledOutput.IsDdp("drgb") && !WledOutput.IsDdp(null),
+                      "protocol name matching", "");
+                Check(WledOutput.MaxLeds("ddp") == WledOutput.MaxDdpLeds && WledOutput.MaxLeds("drgb") == WledOutput.MaxDrgbLeds,
+                      "DDP lifts the DRGB 490 LED cap", WledOutput.MaxLeds("ddp").ToString());
+                Check(WledOutput.DefaultPortFor("ddp") == 4048 && WledOutput.DefaultPortFor("drgb") == 21324,
+                      "default port follows the protocol", "");
+            }
+
             // ============================================================ 11. config.json
             Console.WriteLine();
             Console.WriteLine("[11] config.json parser");

@@ -142,7 +142,7 @@ ffmpeg -f rawvideo -pix_fmt nv12 -s 960x540 -i /tmp/f.nv12 -y /tmp/f.png
 | `TizenAmbilight/src/VideoPlaneCapture.cs` | default backend: `libvideo-capture`, YUV→RGB, HDR, gamut |
 | `TizenAmbilight/src/CaptureApi.cs` | legacy file backend: `dc_request_capture_to_file_sync` |
 | `TizenAmbilight/src/ZoneEngine.cs` | zone layout, per-zone averaging, smoothing helpers |
-| `TizenAmbilight/src/WledOutput.cs` | DRGB packet building, mapping, tone LUT, UDP send |
+| `TizenAmbilight/src/WledOutput.cs` | DRGB and DDP packet building, mapping, tone LUT, UDP send |
 | `TizenAmbilight/src/PowerState.cs` | TV local-API power probe |
 | `TizenAmbilight/src/PngDecoder.cs`, `JpegDecoder.cs`, `Json.cs`, `PngSelfTest.cs` | first-party codecs and checks |
 | `decoder-selftest/` | host test harness and its generated test data |

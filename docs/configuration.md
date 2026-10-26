@@ -51,9 +51,10 @@ then copy the values into `config.json`.
 |---|---|---|
 | **Strip** | | |
 | `wledIp` | *(empty)* | WLED controller IPv4 address. **Empty means nothing is sent.** |
-| `wledPort` | `21324` | WLED UDP realtime port |
+| `protocol` | `drgb` | `drgb` (one datagram, max 490 LEDs) or `ddp` (multi-datagram with a push flag, up to 1500 LEDs). With `ddp`, `wledPort` defaults to 4048 and `wledTimeout` is ignored (WLED's own realtime timeout applies). |
+| `wledPort` | `21324` (`4048` with `ddp`) | WLED UDP realtime port |
 | `wledTimeout` | `1` | seconds WLED stays in live mode after the last frame (DRGB timeout byte) |
-| `ledCount` | `73` | LEDs on the strip, max 490 (one DRGB datagram). Set this. |
+| `ledCount` | `73` | LEDs on the strip, max 490 with `drgb` or 1500 with `ddp`. Set this. |
 | `zoneCount` | = `ledCount` | screen zones. Fewer than `ledCount` leaves the extra LEDs black. |
 | `mapOffset` / `mapReverse` | `0` / `0` | where the strip starts and which way it runs (see above) |
 | `outputEnabled` | `true` | master switch for UDP output |

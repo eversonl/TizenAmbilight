@@ -6,6 +6,13 @@ identifier.
 
 ## [Unreleased]
 
+### Added (build v7)
+- **DDP output** (`protocol` `ddp`). WLED's Distributed Display Protocol on port 4048: a frame is split over
+  datagrams of up to 1440 bytes with a push flag on the last, so strips longer than DRGB's 490 LED
+  datagram limit work (up to 1500) and update atomically. Default stays `drgb`, so existing setups are
+  unchanged. Ported from the Android sibling project wled-tv. Packet layout is covered by 13 new host
+  self-tests (92 total); not yet run against a real WLED controller.
+
 ### Fixed
 - Docs: signing needs a **partner**-level certificate. A public certificate installs and starts the app,
   but Tizen blocks the capture libraries (`Operation not permitted`). Reported in #1; the docs

@@ -87,7 +87,7 @@ namespace TizenAmbilight
             if (c == null || !CanSend(c)) return;
             try
             {
-                string err = WledOutput.SendBlackout(c.WledIp, c.WledPort, c.LedCount);
+                string err = WledOutput.SendBlackout(c.WledIp, c.WledPort, c.LedCount, c.Protocol);
                 L("shutdown blackout (" + c.LedCount + " LEDs) -> " + (err == null ? "OK" : err));
                 VideoPlaneCapture.Shutdown();      // free the plane buffers on a clean exit
             }
@@ -173,7 +173,7 @@ namespace TizenAmbilight
             bool firstBlank = !_blankedForStall;
             _lastBlackoutUtc = DateTime.UtcNow;
             _blankedForStall = true;
-            string err = WledOutput.SendBlackout(cfg.WledIp, cfg.WledPort, cfg.LedCount);
+            string err = WledOutput.SendBlackout(cfg.WledIp, cfg.WledPort, cfg.LedCount, cfg.Protocol);
             if (firstBlank)
             {
                 if (err == null) L(why);

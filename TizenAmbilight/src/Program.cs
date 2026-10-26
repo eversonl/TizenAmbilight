@@ -74,7 +74,7 @@ namespace TizenAmbilight
         public const string AppId = "dev.ritwickverma.TizenAmbilight";
         // Bump this whenever behaviour changes. It sat at "v3" through the HDR decode, the BT.2020->709
         // gamut map and the adaptive tone curve, which made build identification useless in telemetry.
-        public const string Version = "v6";
+        public const string Version = "v7";
 
         // ---- failure handling ----
         const int FailSleepMs = 200;                     // pause after a frame-less iteration
@@ -925,7 +925,7 @@ namespace TizenAmbilight
                                                                     cfg.Gain * punchGain * staleDim,
                                                                     effGamma, cfg.Black,
                                                                     cfg.MapOffset, cfg.MapReverse, cfg.LedCount);
-                        string err = WledOutput.Send(cfg.WledIp, cfg.WledPort, payload);
+                        string err = WledOutput.SendFrame(cfg.WledIp, cfg.WledPort, cfg.Protocol, payload);
                         if (err == null) { st.SendOk++; st.LastSendErr = null; }
                         else { st.SendFail++; st.LastSendErr = err; if (st.SendFail % 20 == 1) L("wled send: " + err); }
                     }

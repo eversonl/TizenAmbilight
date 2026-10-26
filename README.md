@@ -117,7 +117,7 @@ Details and the measurement method are in [docs/how-it-works.md](docs/how-it-wor
 * A Samsung Tizen TV with **Developer Mode** enabled. Open **Apps**, type `1 2 3 4 5` on the remote,
   switch Developer Mode on and enter your computer's IP, then unplug the TV for about 60 s.
 * A **WLED** controller (ESP32/ESP8266) driving an LED strip around the TV, on the same network.
-  Up to 490 LEDs.
+  Up to 490 LEDs by default; set `protocol` to `ddp` in the config for longer strips (up to 1500).
 * **Recommended in WLED:** give the controller a fixed IP (a DHCP reservation), and enable
   *Settings → Sync Interfaces → Realtime → "Force max brightness"* (or set the brightness to 255). WLED's master
   brightness also scales realtime data, so a controller at the default of 128 shows the ambilight at

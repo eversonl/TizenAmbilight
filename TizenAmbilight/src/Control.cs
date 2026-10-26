@@ -50,7 +50,7 @@ namespace TizenAmbilight
                                  break;
                     case "rev":  if (dv == 0 || dv == 1) cfg.MapReverse = dv != 0; break;
                     case "test": if (dv == 0 || dv == 1) cfg.TestPattern = dv != 0; break;
-                    case "leds": if (iv >= 4 && iv <= WledOutput.MaxDrgbLeds) cfg.LedCount = iv; break;
+                    case "leds": if (iv >= 4 && iv <= WledOutput.MaxLeds(cfg.Protocol)) cfg.LedCount = iv; break;
                     // ---- tuning knobs, live. Lower alpha = MORE smoothing (longer EMA time constant).
                     case "alpha": if (dv >= 0.02 && dv <= 1.0) cfg.Alpha = dv; break;
                     case "gain":  if (dv >= 0.1 && dv <= 8.0) cfg.Gain = dv; break;

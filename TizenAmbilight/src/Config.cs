@@ -55,6 +55,7 @@ namespace TizenAmbilight
             public string WledIp;
             public int WledPort;
             public int WledTimeout;
+            public string Protocol;     // "drgb" (one datagram, max 490 LEDs) | "ddp" (multi-datagram, push-committed)
             public string Endpoint;     // telemetry collector base URL
             public int StatsIntervalSec;
             public string PowerUrl;     // the TV's own local API (loopback)
@@ -92,6 +93,7 @@ namespace TizenAmbilight
                     { "wled_ip", WledIp },
                     { "wled_port", (long)WledPort },
                     { "wled_timeout_s", (long)WledTimeout },
+                    { "protocol", Protocol },
                     { "probe_endpoint", Endpoint },
                     { "control_url", ControlUrl },
                     { "stats_interval_s", (long)StatsIntervalSec },
@@ -185,12 +187,16 @@ namespace TizenAmbilight
 
             // ---- strip size. Set ledCount to the strip's LED count; zones follow it unless set. ----
             // zoneCount < ledCount leaves the extra LEDs black (e.g. LEDs hidden behind a stand).
+            // Protocol first: it decides the LED ceiling. DDP lifts DRGB's one-datagram 490 LED cap.
+            c.Protocol = WledOutput.IsDdp(PrefString("protocol", WledOutput.ProtocolNameDrgb))
+                ? WledOutput.ProtocolNameDdp : WledOutput.ProtocolNameDrgb;
+            int maxLeds = WledOutput.MaxLeds(c.Protocol);
             int leds = PrefInt("ledCount", 0), zones = PrefInt("zoneCount", 0);
             if (leds <= 0 && zones <= 0) { leds = DefaultZoneCount; zones = DefaultZoneCount; }
             else if (zones <= 0) zones = leds;
             else if (leds <= 0) leds = zones;
-            c.ZoneCount = Math.Max(4, Math.Min(WledOutput.MaxDrgbLeds, zones));
-            c.LedCount = Math.Max(4, Math.Min(WledOutput.MaxDrgbLeds, leds));
+            c.ZoneCount = Math.Max(4, Math.Min(maxLeds, zones));
+            c.LedCount = Math.Max(4, Math.Min(maxLeds, leds));
 
             c.Alpha = PrefDouble("alpha", 0.25);
             if (c.Alpha <= 0.0) c.Alpha = 1.0;
@@ -304,8 +310,8 @@ namespace TizenAmbilight
 
             // ---- endpoints: all empty by default, so a fresh install sends nothing anywhere ----
             c.WledIp = PrefString("wledIp", "");
-            c.WledPort = PrefInt("wledPort", WledOutput.DefaultPort);
-            if (c.WledPort < 1 || c.WledPort > 65535) c.WledPort = WledOutput.DefaultPort;
+            c.WledPort = PrefInt("wledPort", WledOutput.DefaultPortFor(c.Protocol));
+            if (c.WledPort < 1 || c.WledPort > 65535) c.WledPort = WledOutput.DefaultPortFor(c.Protocol);
             c.WledTimeout = PrefInt("wledTimeout", WledOutput.DefaultTimeoutSeconds);
             if (c.WledTimeout < 1) c.WledTimeout = 1;
             if (c.WledTimeout > 255) c.WledTimeout = 255;
